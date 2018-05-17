@@ -1,0 +1,387 @@
+---
+title: "Catalonia data"
+author: "www.databrew.cc"
+date: "May 17, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(comment = NA, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE, fig.align = 'center', fig.height = 4, fig.width = 7, fig.path = "figures/")
+options(xtable.comment = FALSE)
+library(databrew)
+
+# Define colors
+make_colors <- function(n, categorical = TRUE){
+  if(categorical){
+    cols <- c('#ffd700' ,'#f69500', '#f29672', '#d66857', '#9c4040', '#8d65a0', '#5e498d', '#328cc1', '#076d86', '#5cd29a', '#206535', '#5c8939', '#d0d3c5', '#b0acac', '#3e3e3e')
+  } else {
+    cols <- c("#16394d","#3b4e64","#02507d","#2974a0","#328cc1","#59acd7","#76b7dc","#b9dff9","#d1eaf7","#dde9ef")
+  }
+  out <- colorRampPalette(colors = cols)(n)
+  return(out)
+}
+
+# Define function for getting weighted percentage 
+make_data <- function(data = df,
+                      y = 'independence',
+                      x = 'birth'){
+  
+  data <- data %>%
+    dplyr::select_('weight', x, y)
+  out <- data %>%
+    group_by_(x,y) %>%
+    summarise(people = sum(weight)) %>%
+    ungroup %>%
+    group_by_(x) %>%
+    mutate(p = people / sum(people) * 100) %>%
+    ungroup 
+  return(out)
+}
+plot_data <- function(made_data,
+                      legend_title = NULL,
+                      label_p = FALSE,
+                      label_size = NULL,
+                      cols = NULL){
+  nd <- names(made_data)
+  names(made_data) <- c('x', 'y', 'n', 'p')
+  if(is.null(cols)){
+    cols <- make_colors(length(unique(made_data$y)))
+  }
+  if(is.null(label_size)){
+    label_size = 3
+  }
+  g <- ggplot(data = made_data %>% filter(!is.na(x)),
+         aes(x = x,
+             y = p,
+             group = y,
+             fill = y)) +
+    geom_bar(stat = 'identity',
+             position = 'dodge') +
+    labs(x = Hmisc::capitalize(nd[1]),
+         y = 'Percent') +
+    theme_databrew()
+  if(is.null(legend_title)){
+    legend_title <- nd[2]
+  }
+  if(label_p){
+    g <- g + 
+      geom_text(data = made_data, 
+             aes(
+               y = p + (max(p) * 0.1),
+             label = round(p, digits = 1)),
+             position = position_dodge(width = 1),
+             alpha = 0.7,
+             size = label_size)
+  }
+  g <- g +
+      scale_fill_manual(name = legend_title,
+                      values = cols )
+    
+  return(g)
+}
+
+source('prepare_data.R')
+```
+
+# Independence views
+
+```{r}
+pd <- df %>%
+  group_by(independence, independence) %>%
+  summarise(n = sum(weight)) %>%
+  ungroup %>%
+  mutate(p = n / sum(n) * 100)
+ggplot(data = pd,
+       aes(x = independence,
+           y = p)) +
+  geom_bar(stat = 'identity',
+           fill = make_colors(3)[1],
+           color = make_colors(3)[2]) +
+  geom_label(aes(label = paste0(round(p, digits = 2), '%')),
+             size = 6) +
+  theme_databrew() +
+  labs(x = '',
+       y = 'Percent',
+       title = 'Do you want Catalonia to be an independent state?') +
+  theme(axis.text.x = element_text(size = 15))
+```
+
+## By birth place
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'birth',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Place of birth')
+```
+
+## By mother's birth place
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'birth_mother',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Mother\'s place of birth')
+```
+
+## By father's birth place
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'birth_father',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Father\'s place of birth')
+```
+
+## By both parents' place of birth
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'birth_parents',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Parents\' place of birth')
+```
+
+
+## By grandparents' place of birth
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'birth_grandparents',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Number of grandparents born in Catalonia')
+```
+
+## By sex
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'sex',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Sex')
+```
+
+## By education
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'education',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Education') +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r}
+x <- df %>%
+  group_by(education) %>%
+  summarise(p_ind = sum(weight[independence == 'Yes']) / sum(weight[independence %in% c('Yes', 'No')]) * 100) %>%
+  ungroup %>% 
+  filter(!is.na(education))
+ggplot(data = x,
+       aes(x = education,
+           y = p_ind)) +
+  geom_area(fill = 'yellow',
+            alpha = 0.7,
+            group = 1) +
+  geom_point(color = 'blue',
+             alpha = 0.7) +
+  geom_line(group = 1,
+            color = 'blue',
+            alpha = 0.7) +
+  theme_databrew() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = 'Education',
+       y = '% yes',
+       title = 'Do you want Catalonia to be an independent state?',
+       subtitle = '(Excluding those who did not respond or did not know)') +
+  ylim(0, 100) +
+  geom_hline(yintercept = 50, lty = 2, alpha = 0.6)
+```
+
+## By age
+
+```{r}
+ggplot(data = df %>% filter(independence %in% c('Yes', 'No')),
+       aes(x = age,
+           group = independence,
+           fill = independence)) +
+  geom_density(alpha= 0.8) +
+  scale_fill_manual(name = '',
+                    values = make_colors(3)[1:2]) +
+  theme_databrew() +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Age',
+       y = 'Density')
+```
+
+```{r}
+x <- df %>% mutate(agex = round(age, digits = -1)) %>%
+  filter(agex < 100) %>%
+  group_by(agex) %>%
+  mutate(agey = paste0(min(age), '-', max(age))) %>%
+  ungroup %>%
+  mutate(age = agey) %>%
+  mutate(age = factor(age))
+pd <- make_data(data = x,
+                      x = 'age',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE,
+          label_size = 2) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Age')
+```
+
+## By income
+
+```{r}
+x <- df %>%
+  group_by(income) %>%
+  summarise(p_ind = sum(weight[independence == 'Yes']) / sum(weight[independence %in% c('Yes', 'No')]) * 100) %>%
+  ungroup %>% 
+  filter(! income %in% c('0'),
+         !is.na(income))
+ggplot(data = x,
+       aes(x = income,
+           y = p_ind)) +
+  geom_area(fill = 'yellow',
+            alpha = 0.7,
+            group = 1) +
+  geom_point(color = 'blue',
+             alpha = 0.7) +
+  geom_line(group = 1,
+            color = 'blue',
+            alpha = 0.7) +
+  theme_databrew() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = 'Monthly income (euros)',
+       y = '% yes',
+       title = 'Do you want Catalonia to be an independent state?',
+       subtitle = '(Excluding those who did not respond or did not know)') +
+  ylim(0, 100) +
+  geom_hline(yintercept = 50, lty = 2, alpha = 0.6)
+```
+
+## By language
+
+### Main language
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'language',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Language',
+       subtitle = 'Which language do you consider to be your own?') +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+### Habitual language
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'language_habitual',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Language',
+       subtitle = 'Which language do you speak most often?') +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+### First language
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'language_first',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Language',
+       subtitle = 'Which language did you speak first?') +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+## By religion
+
+```{r}
+pd <- make_data(data = df,
+                      x = 'religion',
+                      y = 'independence')
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Religion',
+       subtitle = 'Do you attend religious ceremonies at least yearly?') +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+## By feeling
+
+
+```{r}
+x <- df %>%
+  group_by(feel) %>%
+  summarise(p_ind = sum(weight[independence == 'Yes']) / sum(weight[independence %in% c('Yes', 'No')]) * 100) %>%
+  ungroup %>%
+  filter(!is.na(feel))
+ggplot(data = x,
+       aes(x = feel,
+           y = p_ind)) +
+  geom_area(fill = 'yellow',
+            alpha = 0.7,
+            group = 1) +
+  geom_point(color = 'blue',
+             alpha = 0.7) +
+  geom_line(group = 1,
+            color = 'blue',
+            alpha = 0.7) +
+  theme_databrew() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = 'With which phrase do you self-identify',
+       y = '% yes',
+       title = 'Do you want Catalonia to be an independent state?',
+       subtitle = '(Excluding those who did not respond or did not know)') +
+  ylim(0, 100) +
+  geom_hline(yintercept = 50, lty = 2, alpha = 0.6)
+```
+
