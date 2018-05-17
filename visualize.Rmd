@@ -84,6 +84,35 @@ plot_data <- function(made_data,
 source('prepare_data.R')
 ```
 
+```{r}
+library(raster)
+library(sp)
+esp <- raster::getData(name = 'GADM',
+                       level = 4,
+                       country = 'ESP')
+cat <- esp[esp@data$NAME_1 == 'Cataluña',]
+cat_fortified <- broom::tidy(cat, id = 'region')
+
+
+colors <- make_colors(length(unique(cat_fortified$group)), categorical = FALSE)
+colors <- sample(colors, length(colors))
+ggplot(data = cat_fortified,
+       aes(x = long,
+           y = lat,
+           group = group)) + #,
+           # group = group,
+           # fill = group)) +
+  geom_polygon(alpha = 0.9,
+       fill = 'yellow',
+       color = 'blue',
+       size = 0.1) + 
+  theme_databrew() +
+  ggthemes::theme_map() 
+  # scale_fill_manual(name = '',
+  #                   values = colors) +
+  #   theme(legend.position = 'none') 
+```
+
 # Independence views
 
 ```{r}
@@ -98,7 +127,8 @@ ggplot(data = pd,
   geom_bar(stat = 'identity',
            fill = make_colors(3)[1],
            color = make_colors(3)[2]) +
-  geom_label(aes(label = paste0(round(p, digits = 2), '%')),
+  geom_text(aes(label = paste0(round(p, digits = 2), '%'),
+                y = p + 3),
              size = 6) +
   theme_databrew() +
   labs(x = '',
@@ -257,7 +287,7 @@ pd <- make_data(data = x,
 plot_data(made_data = pd,
           legend_title = '',
           label_p = TRUE,
-          label_size = 2) +
+          label_size = 3) +
   labs(title = 'Do you want Catalonia to be an independent state?',
        x = 'Age')
 ```
@@ -385,3 +415,149 @@ ggplot(data = x,
   geom_hline(yintercept = 50, lty = 2, alpha = 0.6)
 ```
 
+## Party and language
+```{r}
+pd <- df %>%
+  group_by(language, party, pro_ind, referendum) %>%
+  summarise(n = sum(weight)) %>%
+  ungroup %>%
+  filter(!is.na(referendum)) %>%
+  group_by(party) %>%
+  mutate(p = n / sum(n) * 100) %>%
+  ungroup %>%
+  arrange(referendum) %>%
+  # mutate(party = factor(party,
+  #                       levels = unique(party))) %>%
+    filter(language != 'Other')
+g1 <- ggplot(data = pd %>% filter(pro_ind == 'Yes'),
+       aes(x = party,
+           y = p,
+           fill = language,
+           group = language)) +
+  geom_bar(stat = 'identity',
+           position = 'dodge',
+           width = 1) +
+    theme_databrew() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_fill_manual(name = '',
+                    values = make_colors(length(unique(pd$language)))) +
+  geom_text(aes(label = paste0(round(p, digits = 0), '%'),
+                y = p + 5),
+             size = 3,
+            alpha = 0.7,
+            position = position_dodge(width = 1)) +
+   labs(subtitle = 'Pro-independence parties',
+       x = '',
+       y = 'Percent',
+       title = '') +
+  ylim(0,100)
+g2 <- ggplot(data = pd %>% filter(pro_ind == 'No'),
+       aes(x = party,
+           y = p,
+           fill = language,
+           group = language)) +
+  geom_bar(stat = 'identity',
+           position = 'dodge',
+           width = 1) +
+    theme_databrew() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_fill_manual(name = '',
+                    values = make_colors(length(unique(pd$language)))) +
+  geom_text(aes(label = paste0(round(p, digits = 0), '%'),
+                y = p + 5),
+             size = 3,
+            alpha = 0.7,
+            position = position_dodge(width = 1)) +
+   labs(subtitle = 'Pro-union parties',
+       x = '',
+       y = 'Percent',
+       title = '') +
+  ylim(0,100)
+Rmisc::multiplot(g1, g2, cols = 2)
+```
+
+## View of Europe
+
+```{r}
+ggplot(data = df %>% filter(independence %in% c('Yes', 'No'),
+                            view_europe <= 10),
+       aes(x = independence,
+           y = view_europe,
+           group = independence,
+           color = independence)) +
+  geom_jitter() +
+  geom_violin(alpha = 0.8) +
+  scale_color_manual('Pro-independence',
+                     values = make_colors(3)[1:2]) +
+  theme_databrew() +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Age',
+       y = 'Opinion of Europe')
+```
+
+```{r, echo = TRUE}
+# Europe
+df %>% filter(independence %in% c('Yes', 'No'),
+                            view_europe <= 10) %>%
+  group_by(independence) %>%
+  summarise(avg = mean(view_europe),
+            med = median(view_europe))
+  
+# Church
+df %>% filter(independence %in% c('Yes', 'No'),
+                            view_church <= 10) %>%
+  group_by(independence) %>%
+  summarise(avg = mean(view_church),
+            med = median(view_church))
+
+# Monarchy
+df %>% filter(independence %in% c('Yes', 'No'),
+                            view_monarchy <= 10) %>%
+  group_by(independence) %>%
+  summarise(avg = mean(view_monarchy),
+            med = median(view_monarchy))
+
+# Monarchy
+df %>% filter(independence %in% c('Yes', 'No'),
+                            view_military <= 10) %>%
+  group_by(independence) %>%
+  summarise(avg = mean(view_military),
+            med = median(view_military))
+
+# Spanish govt
+df %>% filter(independence %in% c('Yes', 'No'),
+                            view_spain_govt <= 10) %>%
+  group_by(independence) %>%
+  summarise(avg = mean(view_spain_govt),
+            med = median(view_spain_govt))
+```
+
+```{r}
+x <-df[,grepl('view|independence', names(df))]
+x <- gather(x, key, value, view_europe:view_military)
+x <- x %>%
+  filter(value <= 10) %>%
+  mutate(key = gsub('view_', '', key)) %>%
+  group_by(independence, key) %>%
+  summarise(value = mean(value)) %>%
+  ungroup %>%
+  filter(independence %in% c('Yes', 'No'))
+view_dict <- data_frame(
+  key = c('church', 'europe', 'military', 'monarchy', 'spain_govt'),
+  new_key = c('Church', 'European Union', 'Spanish Military', 'Spanish Monarchy', 'Sp. Government')
+)
+x <- x %>% left_join(view_dict)
+ggplot(data = x %>% filter(!key %in% c('europe', 'spain_govt', 'church')),
+       aes(x = independence,
+           y = value,
+           fill = independence)) +
+  geom_bar(stat = 'identity',
+           position = position_dodge(width = 1)) +
+  facet_wrap(~new_key) +
+  theme_databrew() +
+  scale_fill_manual(name = 'Pro independence',
+                    values = make_colors(3)[1:2]) +
+  theme(legend.position = 'none') +
+  labs(x = 'Pro-independence?',
+       y = 'Favorability (0-10)')
+```

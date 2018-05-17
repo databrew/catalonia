@@ -66,7 +66,12 @@ df <- df %>%
                               ifelse(C700 == 3, 'Equally Spanish and Catalan',
                                      ifelse(C700 == 4, 'More Catalan than Spanish',
                                             ifelse(C700 == 5, 'Only Catalan',
-                                                   NA))))))
+                                                   NA))))),
+         view_europe = P21I,
+         view_church = P21N,
+         view_monarchy = P21J,
+         view_spain_govt = P21D,
+         view_military = P21K)
 
 # Get income
 income_dict <- 
@@ -112,9 +117,15 @@ df <- df %>%
 # Get elections info
 elections_dict <- data_frame(
   P37 = c(1,3,4,6,10,12,20,21,22, 80, 93, 94, 96, 97, 98, 99),
-  party = c('PPC', 'ERC', 'PSC', 'C\'s', 'CUP', 'Podemos',
-            'PDeCAT', 'Junts per Catalunya',
-            'Cat en Com Podem', 'Other', 'None', 'None', 'None', 'None', 'Does not know', 'No answer')
+  party = c('PPC', 'ERC', 'PSC', 'C\'s', 'CUP', 'Podem',
+            'PDeCAT', 'JuntsXCat',
+            'Podem', 'Other', 'None', 'None', 'None', 'None', 'Does not know', 'No answer'),
+  referendum = c('No', 'Yes', 'No', 'No', 'Yes', 'Yes',
+                 'Yes', 'Yes',
+                 'Yes', NA, NA, NA, NA, NA, NA, NA),
+  pro_ind = c('No', 'Yes', 'No', 'No', 'Yes', NA,
+              'Yes', 'Yes',
+              NA, NA, NA, NA, NA, NA, NA, NA)
 )
 df <- df %>% left_join(elections_dict, by = 'P37')
 
@@ -157,7 +168,14 @@ df <- df %>%
                 voted21d,
                 religion,
                 feel,
-                education)
+                education,
+                referendum,
+                pro_ind,
+                view_europe,
+                view_church,
+                view_monarchy,
+                view_spain_govt,
+                view_military)
 
 # Get a variable for both parents born in Catalonia, etc.
 df$birth_parents <- 
