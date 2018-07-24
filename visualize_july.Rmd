@@ -1,0 +1,654 @@
+---
+title: "Catalonia data"
+author: "www.databrew.cc"
+date: "May 17, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(comment = NA, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE, fig.align = 'center', fig.height = 4, fig.width = 7, fig.path = "figures/")
+options(xtable.comment = FALSE)
+library(databrew)
+
+# Define colors
+make_colors <- function(n, categorical = TRUE){
+  if(categorical){
+    cols <- c('#ffd700' ,'#f69500', '#f29672', '#d66857', '#9c4040', '#8d65a0', '#5e498d', '#328cc1', '#076d86', '#5cd29a', '#206535', '#5c8939', '#d0d3c5', '#b0acac', '#3e3e3e')
+  } else {
+    cols <- c("#16394d","#3b4e64","#02507d","#2974a0","#328cc1","#59acd7","#76b7dc","#b9dff9","#d1eaf7","#dde9ef")
+  }
+  out <- colorRampPalette(colors = cols)(n)
+  return(out)
+}
+
+# Define function for getting weighted percentage 
+make_data <- function(data = df,
+                      y = 'independence',
+                      x = 'birth'){
+  
+  data <- data %>%
+    dplyr::select_('weight', x, y)
+  out <- data %>%
+    group_by_(x,y) %>%
+    summarise(people = sum(weight)) %>%
+    ungroup %>%
+    group_by_(x) %>%
+    mutate(p = people / sum(people) * 100) %>%
+    ungroup 
+  return(out)
+}
+plot_data <- function(made_data,
+                      legend_title = NULL,
+                      label_p = FALSE,
+                      label_size = NULL,
+                      cols = NULL){
+  nd <- names(made_data)
+  names(made_data) <- c('x', 'y', 'n', 'p')
+  if(is.null(cols)){
+    cols <- make_colors(length(unique(made_data$y)))
+  }
+  if(is.null(label_size)){
+    label_size = 3
+  }
+  g <- ggplot(data = made_data %>% filter(!is.na(x)),
+         aes(x = x,
+             y = p,
+             group = y,
+             fill = y)) +
+    geom_bar(stat = 'identity',
+             position = 'dodge') +
+    labs(x = Hmisc::capitalize(nd[1]),
+         y = 'Percent') +
+    theme_databrew()
+  if(is.null(legend_title)){
+    legend_title <- nd[2]
+  }
+  if(label_p){
+    g <- g + 
+      geom_text(data = made_data, 
+             aes(
+               y = p + (max(p) * 0.1),
+             label = round(p, digits = 1)),
+             position = position_dodge(width = 1),
+             alpha = 0.7,
+             size = label_size)
+  }
+  g <- g +
+      scale_fill_manual(name = legend_title,
+                      values = cols )
+    
+  return(g)
+}
+
+source('prepare_data_july.R')
+```
+
+```{r}
+df$party <- df$P37 
+df$democracia <- df$P98
+
+df$party <- ifelse(df$party %in% c("Catalunya en Comú Podem", "Podemos"), "Podem",
+                  ifelse(df$party == 'Junts per Catalunya', 'JxCat',
+                         df$party))
+df$party[!df$party %in% c("C's", "CUP", 'ERC', 'JxCat', 'PDeCAT', 'Podem', 'PPC', 'PSC')] <- NA
+
+df$democracia <- 
+  ifelse(df$democracia == 'En algunes circumstàncies un règim autoritari és preferible a un sistema democràtic', 'In some situations an authoritarian regime is preferable to a democratic system',
+         ifelse(df$democracia == 'La democràcia és preferible a qualsevol altra forma de govern', 'Democracy is preferable to any other form of government',
+                ifelse(df$democracia == "Per a persones com jo, m'és igual un règim democràtic o un règim no democràtic", 'Indifferent to democratic vs. non-democratic regime', 
+                       ifelse(df$democracia %in% c('No contesta', 'No ho sap'), 'No answer',
+                              ifelse(is.na(df$democracia), 'No answer', df$democracia)))))
+
+x <- df %>%
+  mutate(weight = as.numeric(gsub(',', '.', PONDERA))) %>%
+  group_by(party, democracia) %>%
+  # summarise(n = sum(weight)) %>%
+  tally %>%
+  ungroup %>%
+  group_by(party) %>%
+  mutate(p = n / sum(n) * 100) %>%
+  mutate(total = sum(n)) %>%
+  ungroup %>%
+  mutate(ll = paste0(round(n), '\nof\n', round(total))) %>%
+  filter(!is.na(party)) %>%
+  filter(democracia == 'Democracy is preferable to any other form of government') %>%
+  arrange(desc(p))
+x$party <- factor(x$party, levels = x$party)
+
+ggplot(data = x,
+       aes(x = party,
+           y = p)) +
+  # geom_point() +
+  # geom_line(group = 1) +
+  geom_bar(stat = 'identity',
+           fill = 'blue',
+           alpha = 0.4) +
+  theme_databrew() +
+  labs(x = 'Party of intended vote',
+       y = 'Percent',
+       title = 'Favourability of democracy',
+       subtitle = '% which state that "democracy is preferable to any other form of government"') +
+  geom_label(aes(label = paste0(round(p, digits = 1), '')),
+             nudge_y = -8,
+             size = 5,
+             alpha = 0.7) #+
+  # geom_text(aes(label = ll),
+  #           nudge_y = -30,
+  #           size = 3,
+  #           alpha = 0.7)
+
+
+pd <- make_data(data = df,
+                      x = 'party',
+                      y = 'democracia') %>%
+  filter(!is.na(party), !is.na(democracia)) %>%
+  filter(democracia == 'Democracy is preferable to any other form of government') %>%
+  arrange(desc(democracia))
+
+plot_data(made_data = pd,
+          legend_title = '',
+          label_p = TRUE) +
+  labs(title = 'Do you want Catalonia to be an independent state?',
+       x = 'Education') +
+  theme(axis.text.x = element_text(angle = 90)) +
+  guides(fill = guide_legend(ncol = 1))
+```
+
+```{r}
+x <- df[,grepl('56|party|weight', names(df))]
+x <- x %>%
+  gather(key, value, P56A:P56K)
+x$value <- ifelse(x$value %in% c("Molt d'acord", "Bastant d'acord"), 'Agree',
+                  'No')
+key_dict <- data.frame(key = paste0('P56', LETTERS[1:11]),
+                       question = c('The less the government interferes in the economy, the better off the country will be.',
+                                    "Taxes should be lowered, even if this means cutting public services.",
+                                    "The government should take measures to reduce income inequality.",
+                                    "Gay and lesbian couples should be able to adopt children under the same conditions as heterosexual couples.",
+                                    "School should teach children to obey authority.",
+                                    "Religion should have no influence on politics.",
+                                    "The law should be obeyed in all situations.",
+                                    "Someone with complete faculties should be able to decide when (s)he wants to die.",
+                                    "With so much immigration, it doesn't feel like home here anymore.",
+                                    "Economic growth should take priority over environmental protection.",
+                                    "Catalonia doesn't have the right to hold a referendum on self-determination."),
+                       title = c('Government and the economy',
+                                 'Taxes and services',
+                                 'Inequality',
+                                 'Homosexual adoption',
+                                 'School and authority', 
+                                 'Religion and politics',
+                                 'Law and obedience',
+                                 'The right to die',
+                                 'Immigration',
+                                 'Economy and environment',
+                                 'Catalonian self-determination'))
+x <- left_join(x, key_dict)
+
+pd <- x %>%
+  group_by(party, question, title, value) %>%
+  summarise(n = sum(weight)) %>%
+  ungroup %>%
+  group_by(party, question, title) %>%
+  mutate(p = n / sum(n) * 100) %>%
+  ungroup %>%
+  filter(value == 'Agree') %>%
+  filter(!is.na(party))
+
+lib_dict <- data.frame(party = c("PPC",
+                    "C's",
+                    "PSC",
+                    "Podem",
+                    "PDeCAT",
+                    "JxCat",
+                    "ERC",
+                    "CUP"),
+                    ref = c('No', 'No', 'No', 
+                            'Yes', 'Yes', 'Yes', 'Yes', 'Yes'))
+pd <- left_join(pd, lib_dict)
+
+pd$party <- 
+  factor(pd$party,
+         levels = rev(c("PPC",
+                    "C's",
+                    "PSC",
+                    "Podem",
+                    "PDeCAT",
+                    "JxCat",
+                    "ERC",
+                    "CUP")))
+
+vis <- function(q){
+  t <- pd$title[pd$question == q][1]
+  x <- pd %>% filter(question == q)
+  ggplot(data = x,
+       aes(x = party,
+           y = p)) +
+  # geom_point() +
+  # geom_line(group = 1) +
+  geom_bar(aes(fill = ref),
+           stat = 'identity',
+           # fill = 'blue',
+           alpha = 0.4) +
+  theme_databrew() +
+  labs(x = 'Party of intended vote',
+       y = 'Percent',
+       title = t,
+       subtitle = paste0('% which agree with following phrase:\n"', q, '"')) +
+  geom_text(aes(label = paste0(round(p, digits = 1), '')),
+             nudge_y = 0.15 * max(x$p),
+             size = 5,
+             alpha = 0.7) +
+    scale_fill_manual(name = 'Party officially in favor of independence referendum?',
+                      values = c('red', 'blue')) +
+    ylim(0, 1.3 * max(x$p))
+}
+
+qs <- sort(unique(pd$question))
+vis(qs[1])
+for(i in 1:length(qs)){
+  qq <- qs[i]
+  print(vis(q = qq))
+}
+
+```
+
+```{r}
+df$axis <- df$P25
+df$axis <- ifelse(df$axis == 'Extrema esquerra', '0',
+                  ifelse(df$axis == 'Extrema dreta', '10',
+                         ifelse(df$axis %in% c('No ho sap', 'No contesta'), NA,
+                                df$axis)))
+df$axis <- as.numeric(as.character(df$axis))
+df$axis <- factor(df$axis,
+                     levels = as.character(sort(unique(df$axis))))
+df$party <- factor(df$party,
+                   levels = c('PPC', "C's",'PSC', 'JxCat',
+                              'PDeCAT', 'ERC', 'Podem', 'CUP'))
+
+ggplot(data = df %>% filter(!is.na(party), !is.na(axis)),
+       aes(x = axis)) +
+  geom_density(aes(fill = party,
+                   group = party),
+               alpha = 0.6,
+               n = 4) +
+  scale_x_discrete(breaks = as.character(c(1, 3, 5, 7, 9)), labels=c('Extreme left', 'Left', 'Center', 'Right', 'Extreme right')) +
+  facet_wrap(~party, ncol = 4) +
+  scale_fill_manual(name = '',
+                    values = c('blue', 'darkorange', 'red', 'darkred', 'darkblue', 'orangered', 'purple', 'yellow')) +
+  theme_databrew() +
+  geom_vline(xintercept = 6.5,
+             lty = 2,
+             alpha = 0.2) +
+    theme(axis.text.x = element_text(angle = 90)) +
+    theme(legend.position = 'none') +
+  labs(y = '',
+       x = 'Ideology',
+       title = 'Ideological position by party',
+       subtitle = 'Based on voters\' self-expressed positioning on left-right scale') +
+  theme(axis.text.y = element_blank())
+
+  # geom_vline(xintercept = 5, lty = 2) +
+  # scale_x_discrete(breaks = c(0, 5, 10), labels=c('Extreme left', 'Center', 'Extreme right'))
+
+x <- df %>%
+  filter(!is.na(axis), !is.na(party)) %>%
+  group_by(party) %>%
+  summarise(right = length(which(as.numeric(as.character(axis)) >= 6)),
+            left = length(which(as.numeric(as.character(axis)) <= 4)),
+            n = n()) %>%
+  ungroup %>%
+  mutate(p_right = right / n * 100,
+         p_left = left / n * 100)
+  
+ggplot(data = x,
+       aes(x = party,
+           y = p_right)) +
+  geom_bar(aes(fill = party), stat = 'identity',
+           alpha =0.8) +
+  theme_databrew() +
+  theme(legend.position = 'none') +
+  scale_fill_manual(name = '',
+                    values = c('blue', 'darkorange', 'red', 'darkred', 'darkblue', 'orangered', 'purple', 'yellow')) +
+  labs(x = 'Party',
+       y = 'Percent',
+       title = 'Self-identification on the "right"',
+       subtitle = 'Percent of voters who self-classify as 6+ on 0-10 left-right scale')
+
+ggplot(data = x,
+       aes(x = party,
+           y = p_left)) +
+  geom_bar(aes(fill = party), stat = 'identity',
+           alpha =0.8) +
+  theme_databrew() +
+  theme(legend.position = 'none') +
+  scale_fill_manual(name = '',
+                    values = c('blue', 'darkorange', 'red', 'darkred', 'darkblue', 'orangered', 'purple', 'yellow')) +
+  labs(x = 'Party',
+       y = 'Percent',
+       title = 'Self-identification on the "left"',
+       subtitle = 'Percent of voters who self-classify as 4- on 0-10 left-right scale')
+
+x <- df %>%
+  filter(!P30 %in% c('No ho sap', 'No contesta')) %>%
+  group_by(axis, P30) %>%
+  tally %>%
+  ungroup %>%
+  tidyr::spread(key = P30, value = n) %>%
+  filter(!is.na(axis))
+nn <- names(x)
+x <- data.frame(x)
+for(j in 2:ncol(x)){
+  x[,j] <- ifelse(is.na(x[,j]), 0, x[,j])
+}
+names(x) <- nn
+x$n <- apply(x[,2:ncol(x)], 1, sum)
+nn <- names(x)
+x <- data.frame(x)
+for(j in 2:(ncol(x)-1)){
+  x[,j] <- x[,j] / x[,'n'] * 100
+}
+names(x) <- nn
+x <- x %>%
+  gather(key, value, `Un estat dins una Espanya federal`:`Una regió d'Espanya`)
+x$key <- ifelse(grepl('dins', x$key), 'More autonomy (federal Spain)',
+                ifelse(grepl('indep', x$key), 'An independent state',
+                             ifelse(grepl('comunitat', x$key), 'Status quo',
+                                    ifelse(grepl('regi', x$key), 'Less autonomy',
+                                           x$key))))
+x <- x %>%
+  filter(!key %in% c('No contesta', 'No ho sap'))
+
+x$key <- factor(x$key,
+                levels = c('An independent state', 
+                           'More autonomy (federal Spain)',
+                           'Status quo',
+                           'Less autonomy'))
+library(MASS)
+ggplot(data =x %>% mutate(Respondants = n),
+       aes(x = axis,
+           y = value,
+           color = key,
+           group = key)) +
+  # geom_point() +
+  geom_line(aes(size = Respondants,
+                stat = 'smooth')
+            ) + 
+  # geom_smooth(se = FALSE,
+  #             aes(size = n)) +
+  theme_databrew() +
+  scale_x_discrete(breaks = as.character(c(1, 3, 5, 7, 9)), labels=c('Extreme left', 'Left', 'Center', 'Right', 'Extreme right')) +
+  guides(color=guide_legend(ncol=1)) +
+  guides(size = guide_legend(ncol = 1, name = 'Sample\nsize')) +
+  scale_color_manual(name = '',
+                     values = RColorBrewer::brewer.pal(n = 4, 'Spectral')) +
+  labs(x = 'Ideology',
+       y = 'Percent',
+       title = 'What Catalans want, by ideology',
+       subtitle = 'June/July 2018, having removed non-applicable answers')
+
+
+```
+
+```{r}
+df$independence <- df$P31
+df$independence <- ifelse(df$independence %in% c('No contesta', 'No ho sap'), 'No answer', ifelse(df$independence == 'Sí', 'Yes', df$independence))
+df$age_group <- round(df$age, -1)
+pd <- make_data(data = df, y = 'independence', x = 'age_group')
+pd <- pd %>% filter(independence != 'No answer')
+
+label_df <- data.frame(y = c(44, 48),
+                      x = c(20, 20),
+                      label = c('No', 'Yes'),
+                      independence = c('No', 'Yes'))
+ggplot(data = pd %>% filter(age_group <= 80) %>% mutate(`Sample size` = people),
+       aes(x = age_group,
+           y = p,
+           color = independence,
+           group = independence)) +
+  geom_point(alpha = 0.6, size = 3) +
+  geom_line(size = 1, alpha = 0.5) +
+  # geom_smooth(se = FALSE, alpha = 0.6) +
+  theme_databrew() +
+  scale_color_manual(name = 'In favor of\nindependence',
+                     values = c('darkred', 'blue')) +
+  labs(x = 'Age (rounded to nearest decade)',
+       y = 'Percent',
+       title = 'Favorability of Catalan independence by age',
+       subtitle = 'Among residents of Catalonia; Data: CEO, June/July, 2018') +
+  geom_label(data = label_df,
+             aes(x = x,
+                 y = y,
+                 label = label)) +
+  theme(legend.position = 'none') +
+  ylim(35, 55)
+
+df$birth <- df $C100
+df <- df %>%
+  mutate(birth = ifelse(grepl('Resta', birth), 'Rest of world',
+                        ifelse(grepl('Europ', birth), 'Europe',
+                               ifelse(grepl('Altres', birth), 'Rest of Spain',
+                                      ifelse(grepl('Cat', birth), 'Catalonia', NA)))))
+df$birth <- factor(df$birth,
+                   levels = c('Catalonia', 'Rest of Spain', 'Europe', 'Rest of world'))
+x <- df %>%
+  group_by(birth, independence) %>%
+  summarise(n = sum(weight)) %>%
+  ungroup %>%
+  group_by(birth) %>%
+  mutate(p = n / sum(n) * 100) %>%
+  ungroup
+
+ggplot(data = x %>% filter(birth %in% c('Catalonia', 'Rest of Spain'),
+                           independence != 'No answer') %>%
+         mutate(birth = paste0('Born in ', birth)),
+       aes(x = independence,
+           y = p)) +
+  geom_bar(stat = 'identity',
+           alpha = 0.6,
+           fill = 'darkorange') +
+  theme_databrew() +
+  facet_wrap(~birth) +
+  labs(title = 'Favorability of independence by birthplace',
+       subtitle = 'Among residents of Catalonia; Data: CEO, June/July, 2018',
+       x = 'In favor of independence',
+       y = 'Percent') +
+  geom_label(aes(label = paste0(round(p, digits = 1), '%')), nudge_y = -3)
+```
+
+```{r}
+df$obedience <- df$P56E
+df <- df %>%
+  mutate(obedience = 
+          ifelse(obedience %in% c("Molt d'acord", "Bastant d'acord"),
+                 'Yes', ifelse(obedience %in% c('No ho sap', 'No contesta', "Ni d'acord ni en desacord"), "Don't know", "No")))
+
+x <- df %>%
+  group_by(obedience, independence) %>%
+  summarise(n = sum(weight)) %>%
+  ungroup %>%
+  group_by(independence) %>%
+  mutate(p = n / sum(n) * 100) %>%
+  ungroup
+
+ggplot(data = x %>%
+         filter(independence != 'No contesta') %>%
+         mutate(independence = ifelse(independence == 'No', 'Anti-independencia',
+                                      ifelse(independence == 'Yes', 'Pro-independencia', independence))),
+       aes(x = independence,
+           y = p,
+           # group = obedience,
+           fill = obedience)) +
+  geom_bar(stat = 'identity',
+       position =position_dodge(width=1),
+       alpha = 0.6) +
+  theme_databrew() +
+  labs(x = '',
+       y = '%',
+       title = 'Opinions sobre autoritat i obediencia per posicionament independentista',
+       subtitle = '% d\'acord amb la següente frase: "L’escola ha d’ensenyar als nens a obeir l’autoritat"') +
+  scale_fill_manual(name = "D'acord amb la frase",
+                    values = c('grey', 'red', 'blue')) +
+  geom_text(aes(x = independence,
+                y = p,
+                label = paste0(round(p, digits = 1), '%'),
+                group = obedience),
+             position=position_dodge(width=1),
+            alpha = 0.6,
+            size = 5)
+```
+
+```{r}
+x <- df %>%
+  mutate(arrimadas = val_Arrimadas) %>%
+  mutate(arrimadas = ifelse(arrimadas == 'Molt deficient',
+                            '0',
+                            ifelse(arrimadas == 'Excel·lent',
+                                   '10',
+                                   NA))) %>%
+  mutate(iceta = val_Iceta) %>%
+  mutate(iceta = ifelse(iceta == 'Molt deficient',
+                            '0',
+                            ifelse(iceta == 'Excel·lent',
+                                   '10',
+                                   NA))) %>%
+  mutate(albiol = val_Albiol) %>%
+  mutate(albiol = ifelse(albiol == 'Molt deficient',
+                            '0',
+                            ifelse(albiol == 'Excel·lent',
+                                   '10',
+                                   NA))) %>%
+  mutate(junqueras = val_Junqueras) %>%
+  mutate(junqueras = ifelse(junqueras == 'Molt deficient',
+                            '0',
+                            ifelse(junqueras == 'Excel·lent',
+                                   '10',
+                                   NA))) %>%
+    mutate(torra = val_Torra) %>%
+  mutate(torra = ifelse(torra == 'Molt deficient',
+                            '0',
+                            ifelse(torra == 'Excel·lent',
+                                   '10',
+                                   NA))) %>%
+  mutate(puigdemont = val_Puigdemont) %>%
+  mutate(puigdemont = ifelse(puigdemont == 'Molt deficient',
+                            '0',
+                            ifelse(puigdemont == 'Excel·lent',
+                                   '10',
+                                   NA))) %>%
+  dplyr::select(axis, arrimadas, torra, albiol, junqueras, iceta, puigdemont) %>%
+  gather(key, value, arrimadas:puigdemont) %>%
+  mutate(value = as.numeric(value))
+
+pd <- x %>%
+  group_by(axis,key) %>%
+  summarise(value = mean(as.numeric(value),na.rm = TRUE),
+            Sample = n()) %>%
+  ungroup %>%
+  mutate(key = Hmisc::capitalize(key))
+label_df <- pd %>%
+  filter(axis == '1') %>%
+  mutate(axis = sample(seq(1, 1.5, length = 10), 6, replace = T)) 
+label_df$value[label_df$key == 'Albiol'] <- -0.5
+ggplot(data = pd %>% filter(!is.na(axis)),
+       aes(x = axis,
+           y = value,
+           color = key,
+           group = key)) +
+  geom_smooth(se = FALSE) +
+  # geom_line() +
+  geom_point(aes(size = Sample),
+             alpha = 0.5) +
+  theme_databrew() +
+  scale_x_discrete(breaks = as.character(c(1, 3, 5, 7, 9)), labels=c('Extreme left', 'Left', 'Center', 'Right', 'Extreme right'))  +
+  labs(y = 'Perceived performance',
+       x = 'Ideology',
+       title = 'Citizens\'s evaluation of politicians by ideology',
+       subtitle = 'Based on voters\' self-expressed positioning on left-right scale, 0=bad; 10=excellent') +
+  geom_label(data = label_df,
+             aes(x = axis,
+                 y = value + 0.5,
+                 color = key,
+                 label = key),
+             alpha = 0.8) +
+  theme(legend.position = 'none') +
+  ylim(-1, 10) +
+  scale_color_manual(name = '',
+                     values = colorRampPalette(RColorBrewer::brewer.pal(n = 9,
+                                                       name = 'Set1'))(length(unique(pd$key)))) 
+
+cols <- colorRampPalette(RColorBrewer::brewer.pal(n = 9,
+                                                       name = 'Set1'))(length(unique(pd$key)))
+politicians <- sort(unique(pd$key))
+for(i in 1:length(politicians)){
+  this_col <- cols[i]
+  this_politician <- politicians[i]
+  label_df_sub <- pd %>%
+  filter(axis == '1',
+         key == this_politician)
+  pdd <- pd %>% filter(key == this_politician)
+  g <- ggplot(data = pdd %>% filter(!is.na(axis)),
+       aes(x = axis,
+           y = value,
+           color = key,
+           group = key)) +
+  geom_smooth(se = FALSE) +
+  # geom_line() +
+  geom_point(aes(size = Sample),
+             alpha = 0.5) +
+  theme_databrew() +
+  scale_x_discrete(breaks = as.character(c(1, 3, 5, 7, 9)), labels=c('Extreme left', 'Left', 'Center', 'Right', 'Extreme right'))  +
+  labs(y = 'Perceived performance',
+       x = 'Ideology',
+       title = paste0('Citizens\'s evaluation of politicians by ideology: ', this_politician),
+       subtitle = 'Based on voters\' self-expressed positioning on left-right scale, 0=bad; 10=excellent') +
+  geom_label(data = label_df_sub,
+             aes(x = axis,
+                 y = value + 0.5,
+                 color = key,
+                 label = key),
+             alpha = 0.8) +
+  theme(legend.position = 'none') +
+  scale_color_manual(name = '',
+                     values = this_col) +
+    ylim(0,10)
+  print(g)
+  Sys.sleep(0.5)
+}
+
+
+ this_col <- cols[c(2,5)]
+  this_politician <- politicians[c(2,5)]
+  label_df_sub <- pd %>%
+  filter(axis == '1',
+         key %in% this_politician)
+  pdd <- pd %>% filter(key %in% this_politician)
+  g <- ggplot(data = pdd %>% filter(!is.na(axis)),
+       aes(x = axis,
+           y = value,
+           color = key,
+           group = key)) +
+  geom_smooth(se = FALSE) +
+  geom_line(alpha = 0.6) +
+  geom_point(aes(size = Sample),
+             alpha = 0.5) +
+  theme_databrew() +
+  scale_x_discrete(breaks = as.character(c(1, 3, 5, 7, 9)), labels=c('Extreme left', 'Left', 'Center', 'Right', 'Extreme right'))  +
+  labs(y = 'Perceived performance',
+       x = 'Ideology',
+       title = paste0('Citizens\'s evaluation of politicians by ideology'),
+       subtitle = 'Based on voters\' self-expressed positioning on left-right scale, 0=bad; 10=excellent') +
+  geom_label(data = label_df_sub,
+             aes(x = axis,
+                 y = value + 0.5,
+                 color = key,
+                 label = key),
+             alpha = 0.8) +
+  theme(legend.position = 'none') +
+  scale_color_manual(name = '',
+                     values = this_col) +
+    ylim(0,10)
+  print(g)
+
+```

@@ -113,6 +113,98 @@ ggplot(data = cat_fortified,
   #   theme(legend.position = 'none') 
 ```
 
+# Place of birth and party
+
+```{r}
+pd <- df %>%
+  group_by(party, birth) %>%
+  summarise(n = sum(weight)) %>%
+  ungroup %>%
+  group_by(party) %>%
+  mutate(p = n / sum(n) * 100) %>%
+  ungroup %>%
+  arrange(party, birth) %>%
+  mutate(birth = factor(birth,
+                        levels = c('Rest of World',
+                                   'Europe',
+                                   'Rest of Spain',
+                                   'Catalonia'))) %>%
+  filter(!party %in% c('None', 'Other', 'No answer', 'Does not know'),
+         !is.na(party)) %>%
+  group_by(party) %>%
+  mutate(max_p = p[birth == 'Catalonia']) %>%
+  ungroup %>%
+  arrange(desc(max_p)) %>%
+  mutate(party = factor(party,
+                        levels = unique(party)))
+
+cols <- rev(databrew::make_colors(n = 4, categorical = FALSE, b2g = FALSE)[1:4])
+ggplot(data = pd,
+       aes(x = party,
+           y = p,
+           group = birth,
+           fill = birth)) +
+  geom_bar(#col = 'black', 
+           #lwd = 0.2,
+           stat = 'identity') +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_fill_manual(name = 'Place of birth',
+                    values = cols) +
+  geom_hline(yintercept = c(25, 50, 75),
+             lty = 2,
+             alpha = 0.4) +
+  theme_databrew() +
+  labs(x = 'Party of preference',
+       y = 'Percentage')
+
+```
+
+# Place of parents' birth and party
+
+```{r}
+pd <- df %>%
+  filter(!is.na(birth_parents)) %>%
+  group_by(party, birth_parents) %>%
+  summarise(n = sum(weight)) %>%
+  ungroup %>%
+  group_by(party) %>%
+  mutate(p = n / sum(n) * 100) %>%
+  ungroup %>%
+  arrange(party, birth_parents) %>%
+  mutate(birth_parents = factor(birth_parents,
+                        levels = rev(c('Both from Catalonia',
+                                   'One from Catalonia',
+                                   'None from Catalonia')))) %>%
+  filter(!party %in% c('None', 'Other', 'No answer', 'Does not know'),
+         !is.na(party)) %>%
+  group_by(party) %>%
+  mutate(max_p = p[birth_parents == 'Both from Catalonia']) %>%
+  ungroup %>%
+  arrange(desc(max_p)) %>%
+  mutate(party = factor(party,
+                        levels = unique(party)))
+
+cols <- rev(databrew::make_colors(n = 3, categorical = FALSE, b2g = FALSE)[1:3])
+ggplot(data = pd,
+       aes(x = party,
+           y = p,
+           group = birth_parents,
+           fill = birth_parents)) +
+  geom_bar(#col = 'black', 
+           #lwd = 0.2,
+           stat = 'identity') +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_fill_manual(name = 'Parents\'s birthplace',
+                    values = cols) +
+  geom_hline(yintercept = c(25, 50, 75),
+             lty = 2,
+             alpha = 0.4) +
+  theme_databrew() +
+  labs(x = 'Party of preference',
+       y = 'Percentage')
+
+```
+
 # Independence views
 
 ```{r}
@@ -391,7 +483,8 @@ plot_data(made_data = pd,
 ```{r}
 x <- df %>%
   group_by(feel) %>%
-  summarise(p_ind = sum(weight[independence == 'Yes']) / sum(weight[independence %in% c('Yes', 'No')]) * 100) %>%
+  summarise(p_ind = sum(weight[independence == 'Yes']) / sum(weight[independence %in% c('Yes', 'No')]) * 100,
+            n = n()) %>%
   ungroup %>%
   filter(!is.na(feel))
 ggplot(data = x,
@@ -560,4 +653,45 @@ ggplot(data = x %>% filter(!key %in% c('europe', 'spain_govt', 'church')),
   theme(legend.position = 'none') +
   labs(x = 'Pro-independence?',
        y = 'Favorability (0-10)')
+```
+
+## By age and place of birth
+
+```{r}
+x <- df %>%
+  mutate(agex = round(age, -1)) %>%
+  filter(agex < 100) %>%
+  group_by(agex) %>%
+  mutate(agey = paste0(min(age), '-', max(age))) %>%
+  ungroup %>%
+  mutate(age = agey) %>%
+  mutate(age = factor(age)) %>%
+  group_by(age, birth) %>%
+    summarise(p_ind = sum(weight[independence == 'Yes']) / sum(weight[independence %in% c('Yes', 'No')]) * 100,
+              n = n()) %>%
+  ungroup  %>%
+  filter(!birth %in% c('Rest of World', 'Europe')) 
+  # mutate(birth = ifelse(birth == 'Catalonia', 'Catalunya', 'Espanya')) %>%
+  # filter(! age %in% '86-94')
+
+ggplot(data = x,
+       aes(x = age,
+           y = p_ind,
+           color = birth,
+           group = birth)) +
+  geom_line() +
+  geom_point(aes(size = n)) +
+  scale_color_manual(name = 'Nascut:',
+                     values = make_colors(length(unique(x$birth)))) +
+  scale_size_continuous(name = 'Mida de mostre',
+                    breaks = c(10, 50, 200)) +
+  theme_databrew() +
+  labs(x = 'Edat',
+       y = '% pro-independencia')
+```
+
+## Feeling
+
+```{r}
+
 ```
