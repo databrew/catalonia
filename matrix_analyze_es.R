@@ -105,7 +105,7 @@ education_dict <-data_frame(
 
 # Education curve
 x <- df %>%
-  filter(date >= '2017-09-01') %>%
+  filter(date >= '2018-01-01') %>%
   mutate(independence = P31) %>%
   mutate(independence = ifelse(independence %in% c('No ho sap', 
                                                    'No contesta'),
