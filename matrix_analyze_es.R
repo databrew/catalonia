@@ -6,10 +6,19 @@ df <- read.spss('2014_Microdades_anonimitzades_fusio_cine_pres.sav')
 df <- data.frame(df)
 # Create date
 df$date <- 
-  as.Date(paste0(ifelse(df$ANY < 2000,
-                        df$ANY + 2000,
-                        df$ANY), '-', df$MES, '-01'))
-
+  paste0(ifelse(df$ANY < 2000,
+                df$ANY + 2000,
+                df$ANY), '-', df$MES, '-01')
+df$date <- as.character(as.Date(df$date))
+# Group together
+df$date <- ifelse(df$date == '2014-03-01', '2014-04-01',
+                  ifelse(df$date == '2014-10-01', '2014-11-01',
+                         ifelse(df$date == '2015-03-01', '2015-02-01',
+                                ifelse(df$date == '2017-06-01', '2017-07-01',
+                                       ifelse(df$date == '2018-06-01',
+                                              '2018-07-01',
+                                              df$date)))))
+df$date <- as.Date(df$date)
 # Functions
 mround <- function(x,base){ 
   base*round(x/base) 
@@ -27,6 +36,18 @@ round_percent <- function(x) {
   res 
 }
 
+############################################ Lies about independentism
+
+# De derechas
+# Lack of solidarity
+# Xenophobia (immigration)
+# Catholic
+# Anti-democratic
+# Authoritarian
+
+
+
+############################################# 5 reasons why independence is inevitable
 
 # Age
 # Education axis
@@ -372,35 +393,54 @@ x <- x %>%
                                                    'Junts pel Sí'),
                                       'JxCat/PDCat', party))))
 x <- x %>%
-  group_by(axis,
+  # Get better groupings
+  mutate(axis = as.numeric(as.character(axis))) %>%
+  mutate(axis = ifelse(axis <= 1, 'Extrema izquierda',
+                       ifelse(axis <= 4, 'Izquierda',
+                              ifelse(axis == 5, 'Centro',
+                                     ifelse(axis <= 8, 'Derecha',
+                                            ifelse(axis <= 10, 'Extrema derecha', NA))))))
+x$axis <- factor(x$axis, levels = c('Extrema izquierda', 'Izquierda', 'Centro', 'Derecha', 'Extrema derecha'))
+
+x <- x %>% group_by(axis,
            party) %>%
   tally %>%
   ungroup %>%
-  group_by(axis) %>%
+  group_by(party) %>%
   mutate(p = n / sum(n) * 100) %>%
   ungroup
 cols <- c('#3492C7',
           '#FF5733',
           '#E5c388')
 # cols <- rev(cols)
+
+party_dict <- data.frame(party = c("PPC",
+                                   "C's",
+                                   "PSC",
+                                   "Podem(os)",
+                                   "JxCat/PDCat",
+                                   "ERC",
+                                   "CUP"),
+                         union = as.character(c(1,1,1,2,3,3,3)))
+x <- x %>% left_join(party_dict)
 x$party <- factor(x$party,
-                  levels = c("PPC",
+                  levels = rev(c("PPC",
                              "C's",
                              "PSC",
-                             "JxCat/PDCat",
                              "Podem(os)",
+                             "JxCat/PDCat",
                              "ERC",
-                             "CUP"))
+                             "CUP")))
 ggplot(data = x %>%
          filter(!is.na(axis),
                 !is.na(party)),
        aes(x = axis,
            y = p)) +
   geom_bar(stat = 'identity',
-           aes(fill = party),
+           aes(fill = union),
            color = 'black',
            lwd = 0.3) +
-  facet_wrap(~party, ncol = 1) +
+  facet_wrap(~party, ncol = 7) +
   theme_databrew() +
   theme(legend.position = 'none') +
   labs(x = 'Ideología política',
@@ -408,14 +448,152 @@ ggplot(data = x %>%
        caption = 'Datos: combinación de las 2 encuestas CEO de 2018.\n3,000 residentes de Cataluña con ciudadanía de España, edad 18+.',
        title = 'Distribución de ideología por partido',
        subtitle = 'El independentismo a la izquierda.\nEl unionismo a la derecha.') +
-  scale_x_discrete(breaks = as.character(c(1, 3, 5, 7, 9)), labels=c('Extrema\nizquierda', 'Izquierda', 'Centro', 'Derecha', 'Extrema\nderecha')) +
-  theme(axis.text.x = element_text(size = 10)) +
-  geom_vline(xintercept = 6, lty = 2, alpha = 0.3) +
+  # scale_x_discrete(breaks = as.character(c(1, 3, 5, 7, 9)), labels=c('Extrema\nizquierda', 'Izquierda', 'Centro', 'Derecha', 'Extrema\nderecha')) +
+  theme(axis.text.x = element_text(size = 10, angle = 90)) +
+  # geom_vline(xintercept = 6, lty = 2, alpha = 0.3) +
   geom_text(aes(label = paste0(round(p, digits = 1),'%')),
             alpha = 0.5,
             size = 3,
-            nudge_y = 5) +
+            nudge_y = 2) +
   scale_fill_manual(name = '',
-                    values = RColorBrewer::brewer.pal(n = 7, name = 'Spectral')) +
+                    values = RColorBrewer::brewer.pal(n = 3, name = 'Spectral')) +
   ylim(0, 51) +
   scale_y_continuous(breaks = c(0,20, 40))
+
+# Extra: party dist by axis##########
+
+x <- df %>% 
+  filter(date >= '2018-01-01')  %>%
+  mutate(axis = P25)
+x$axis <- as.character(x$axis)
+x$axis <- ifelse(x$axis == 'Extrema esquerra', '0',
+                 ifelse(x$axis == 'Extrema dreta', '10',
+                        ifelse(x$axis %in% c('No ho sap', 'No contesta'), NA,
+                               x$axis)))
+x$axis2 <- as.numeric(as.character(x$axis))
+x$axis2 <- factor(x$axis2,
+                  levels = as.character(sort(unique(x$axis2))))
+x$axis <- x$axis2
+
+x <- x %>%
+  mutate(party = P24) %>%
+  mutate(independence = P31) %>%
+  mutate(independence = ifelse(independence %in% c('No ho sap', 
+                                                   'No contesta'),
+                               'NS/NC', as.character(independence)))
+
+x <- x %>%
+  mutate(party = as.character(party)) %>%
+  mutate(party = ifelse(party %in%
+                          c('No ho sap',
+                            'No contesta',
+                            'Altres partits',
+                            'PACMA',
+                            'Democràcia i Llibertat',
+                            'CDC',
+                            'ICV-EUiA',
+                            'Cap'),
+                        'Otro/NS/NC',
+                        ifelse(party %in% c('Barcelona en Comú',
+                                            'Catalunya sí que es pot',
+                                            'En Comú Podem',
+                                            'Podemos',
+                                            'Catalunya en Comú Podem'),
+                               'Podem(os)',
+                               ifelse(party %in% c('Junts per Catalunya',
+                                                   'PDeCat',
+                                                   'PDeCAT',
+                                                   'Junts pel Sí'),
+                                      'JxCat/PDCat', party)))) %>%
+  mutate(party = ifelse(is.na(party), 'Otro/NS/NC', party)) %>%
+  filter(!is.na(axis))
+
+x <- x %>% group_by(axis,
+                    party) %>%
+  tally %>%
+  ungroup %>%
+  group_by(axis) %>%
+  mutate(p = n / sum(n) * 100) %>%
+  ungroup
+cols <- colorRampPalette(c('#3492C7',
+          '#FF5733',
+          '#E5c388'))(7)
+cols <- rev(cols)
+bp <- function(x,z){RColorBrewer::brewer.pal(n = 8,name =x)[z]}
+
+cols <- 
+  c(bp('Reds',8),
+    bp('Reds',6),
+    bp('Reds',4),
+    bp('Greys',5),
+    bp('Blues',4),
+    bp('Blues',6),
+    bp('Blues',8)
+  )
+cols <- rev(cols)
+cols <- c(cols[1:3], 'white', cols[4:7])
+# barplot(1:length(cols), col = cols)
+x$party <- factor(x$party,
+                  levels = rev(c("PPC",
+                                 "C's",
+                                 "PSC",
+                                 "Podem(os)",
+                                 'Otro/NS/NC',
+                                 "JxCat/PDCat",
+                                 "ERC",
+                                 "CUP")))
+ggplot(data = x,
+       aes(x = axis,
+           y = p,
+           fill = party)) +
+  geom_bar(stat = 'identity',
+           color = 'black',
+           position = 'stack'
+           # position = position_dodge(width = 0.8)
+           ) +
+  scale_fill_manual(name = 'Partido', values = cols) +
+  theme_databrew() +
+  # theme(legend.position = 'none') +
+  labs(x = 'Autoubicación en escala izquierda-derecha (0-10)',
+       y = 'Porcentaje',
+       caption = 'Datos: combinación de las 2 encuestas CEO de 2018.\n3,000 residentes de Cataluña con ciudadanía de España, edad 18+.',
+       title = 'Distribución de partidos de afición por ideología',
+       subtitle = '0 (extrema izquierda) a 10 (extrema derecha)') +
+  scale_x_discrete(breaks = as.character(c(0:10)), labels=c('0\nExtrema\nizquierda',
+                                                            '1',
+                                                            '2\nIzquierda',
+                                                            '3', '4\nCentro\nizquierda', '5',
+                                                            '6\nCentro\nderecha', '7','8\nDerecha',
+                                                            '9', '10\nExtrema\nderecha')) +
+  theme(axis.text.x = element_text(size = 20),
+        legend.text = element_text(size = 20),
+        plot.title = element_text(size = 26)) +
+  guides(fill=guide_legend(ncol=2))
+
+y <- x %>%
+  group_by(axis)%>%
+  summarise(n = sum(n)) %>%
+  ungroup %>%
+  mutate(p = n / sum(n) * 100)
+
+ggplot(data = y,
+       aes(x = axis,
+           y = p)) +
+  geom_bar(stat = 'identity',
+           fill = NA,
+           color = 'black') +
+  theme_databrew() +
+  labs(x = 'Autoubicación en escala izquierda-derecha (0-10)',
+       y = 'Porcentaje de todos los encuestados',
+       title = 'Distribución ideológica de todos los encuestados') +
+  theme(axis.text.x = element_text(size = 20),
+        legend.text = element_text(size = 20),
+        plot.title = element_text(size = 26)) +
+  geom_text(aes(label = paste0(round(p, digits = 1),'%')),
+            nudge_y = 1.5)
+  # geom_text(aes(label = round(p, digits = 1),
+  #               y = p + 1),
+  #           size = 1.5,
+  #           alpha = 0.5,
+  #           position = position_dodge(width = 0.8))
+  
